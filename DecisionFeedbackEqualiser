@@ -1,0 +1,584 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import norm as norm
+import math
+import random
+# Note needs Practical 1 Uniform function and Random generator to work
+###########################################Practical 2 DFE###################################################################
+
+# Authour : Natasha Mulumba
+# LAst modified : 21 October 2021 Version 8
+# Generate random bits
+# Inistalise Arrays
+def RandomBitsGenerator(N):
+    randombits_arr = []  # keep the guassian values in
+    randomGausval_arr = []  # Keep the random guassian values
+    for i in range(N):
+        randomGausval_arr.append(uniform())  # random values with a guassian distribuiton
+    for i in range(len(randomGausval_arr)):
+        if randomGausval_arr[i] > 0.5:
+            randombits_arr.append(1)
+        elif randomGausval_arr[i] <= 0.5:
+            randombits_arr.append(0)
+    print(len(randombits_arr))
+    return randombits_arr
+
+
+def BitToSymbolMapping(randomBitArray, constellationName):
+    generatedSymbols = []
+    if constellationName == 'bpsk':
+        for x in range(len(randomBitArray)):
+            if randomBitArray[x] == 0:
+                generatedSymbols.append(-1)
+            elif randomBitArray[x] == 1:
+                generatedSymbols.append(1)
+        return generatedSymbols
+    elif constellationName == '4QAM':
+        if (len(randomBitArray) % 2) != 0:
+            randomBitArray.append(0)
+        x = 0
+        while x < (len(randomBitArray)):
+            if randomBitArray[x] == 0 and randomBitArray[x + 1] == 0:
+                generatedSymbols.append((1 + 1j) / math.sqrt(2))
+            elif randomBitArray[x] == 0 and randomBitArray[x + 1] == 1:
+                generatedSymbols.append((-1 + 1j) / math.sqrt(2))
+            elif randomBitArray[x] == 1 and randomBitArray[x + 1] == 1:
+                generatedSymbols.append((-1 - 1j) / math.sqrt(2))
+            elif randomBitArray[x] == 1 and randomBitArray[x + 1] == 0:
+                generatedSymbols.append((1 - 1j) / math.sqrt(2))
+            x = x + 2
+        print(len(generatedSymbols))
+        return generatedSymbols
+    elif constellationName == '8PSK':
+        if (len(randomBitArray) % 3) == 2:
+            randomBitArray.append(0)
+        if (len(randomBitArray) % 3) == 1:
+            randomBitArray.append(0)
+            randomBitArray.append(0)
+
+        x = 0
+        while x < (len(randomBitArray)):
+            if randomBitArray[x] == 1 and randomBitArray[x + 1] == 1 and randomBitArray[x + 2] == 1:
+                generatedSymbols.append(1)
+            elif randomBitArray[x] == 1 and randomBitArray[x + 1] == 1 and randomBitArray[x + 2] == 0:
+                generatedSymbols.append((1 + 1j) / math.sqrt(2))
+            elif randomBitArray[x] == 0 and randomBitArray[x + 1] == 1 and randomBitArray[x + 2] == 0:
+                generatedSymbols.append(1j)
+            elif randomBitArray[x] == 0 and randomBitArray[x + 1] == 1 and randomBitArray[x + 2] == 1:
+                generatedSymbols.append((-1 + 1j) / math.sqrt(2))
+            elif randomBitArray[x] == 0 and randomBitArray[x + 1] == 0 and randomBitArray[x + 2] == 1:
+                generatedSymbols.append(-1)
+            elif randomBitArray[x] == 0 and randomBitArray[x + 1] == 0 and randomBitArray[x + 2] == 0:
+                generatedSymbols.append((-1 - 1j) / math.sqrt(2))
+            elif randomBitArray[x] == 1 and randomBitArray[x + 1] == 0 and randomBitArray[x + 2] == 0:
+                generatedSymbols.append(-1j)
+            elif randomBitArray[x] == 1 and randomBitArray[x + 1] == 0 and randomBitArray[x + 2] == 1:
+                generatedSymbols.append((-1 + 1j) / math.sqrt(2))
+            x = x + 3
+        print(len(generatedSymbols))
+        return generatedSymbols
+
+
+def receivedsymbolGenerator(randomgenSymbols, SNRVal, constellationName):
+    receivedSymbols = []
+    Noise = []
+    fbit_val = 0
+    if constellationName == 'bpsk':
+        fbit_val = 1
+    elif constellationName == '4QAM':
+        fbit_val = 2
+    elif constellationName == '8PSK':
+        fbit_val = 3
+    # generate N number of noise values
+    for x in range(len(randomgenSymbols)):
+        Noise.append((gauss()) + ((gauss()) * 1j) / math.sqrt(2))  # USE GaussianDistribution from PRactical 1
+    # Get Sigma(std deviation value)
+    stdDev = 1 / math.sqrt(math.pow(10, (1 * SNRVal) / 10) * 2*fbit_val)
+    if constellationName == 'bpsk':
+        for j in range(len(randomgenSymbols)):
+            receivedSymbols.append(randomgenSymbols[j] + stdDev * Noise[j])
+    if constellationName == '4QAM':
+        for k in range(len(randomgenSymbols)):
+            receivedSymbols.append(randomgenSymbols[k] + stdDev * Noise[k])
+    if constellationName == '8PSK':
+        for m in range(len(randomgenSymbols)):
+            receivedSymbols.append(randomgenSymbols[m] + stdDev * Noise[m])
+
+    return receivedSymbols
+
+
+def DecisionFeedbackEqualiser(received_sybls, c_static, Constellation, NumSymbls, constellationArray):
+    """ConstelSize: Determine number of symbols
+       Delta_array : Keep Delta values for each constellation symbol( used later for comparison
+       sent_symbols: Store estimated symbol
+       convt :Keep track of convolution part of DFE ( for n=0 to len(c_static)-1 do (St-nCn))
+       received_sybls : Keep track of received symbols
+       Constellation: keep the name of the constellation
+       ConstellationArray : Contains a list of the symbols according to  modulation scheme passed in
+       """
+
+    ConstelSize = 0
+    if Constellation == 'bpsk':
+        ConstelSize = 2
+    if Constellation == '4QAM':
+        ConstelSize = 4
+        NumSymbls = int((NumSymbls / 2))
+    if Constellation == '8PSK':
+        ConstelSize = 8
+        NumSymbls = int((NumSymbls / 3) + 1)
+
+    Delta_array = []
+    for i in range(ConstelSize):
+        Delta_array.append(0)
+    convArray = []
+
+    sent_symbols = []  # keep track of symbols sent
+    sent_symbols.clear()
+    for i in range(len(c_static) - 1):
+        sent_symbols.append(constellationArray[0])  # Append header symbols
+    estTimeVal = 0
+    num = 0
+    convt = 0
+
+    # convoluation part ###########
+    """First for loop : Repeat the process for t=0 -> t=NumberofSymbols
+       Second for loop : Determine Delta for each constellation symbol  
+    """
+    for t in range(NumSymbls):
+        for n in range((ConstelSize)):
+            convt = convt + constellationArray[n] * c_static[0]
+            x = 1
+            while x <= len(c_static) - 1:
+                convt = convt + sent_symbols[len(sent_symbols) - x] * c_static[x]
+                x = x + 1
+            Delta_array[n] = abs(pow((received_sybls[t] - convt), 2))
+            convt = 0
+        # Get which symbol was transferred
+        Symbol_index = 0
+        smallest_dis = 100  # set to large number
+        for i in range(len(Delta_array)):
+            if Delta_array[i] < smallest_dis:
+                smallest_dis = Delta_array[i]
+                Symbol_index = i
+        sent_symbols.insert(len(sent_symbols), constellationArray[Symbol_index])  # insert new symbol in sent symbols
+    # print("Transmited list is", sent_symbols)
+    return sent_symbols[len(c_static) - 1:]
+
+
+def getSymbolError(generatedSymbols, estimatedSymbols, NumSymbols):
+    Errors = 0
+    for i in range(len(generatedSymbols)):
+        if estimatedSymbols[i] != generatedSymbols[i]:
+            Errors = Errors + 1
+    SER = Errors / NumSymbols
+
+    return SER
+
+
+def ConvertSymbolBackToBits_BPSK(estimatedSymbols, ConstellationName):
+    finalBitsArray = []
+    if ConstellationName == 'bpsk':
+        for i in range(len(estimatedSymbols)):
+            if estimatedSymbols[i] == -1:
+                finalBitsArray.append(0)
+            if estimatedSymbols[i] == 1:
+                finalBitsArray.append(1)
+        return finalBitsArray
+    if ConstellationName == '4QAM':
+        for i in range(len(estimatedSymbols)):
+            if estimatedSymbols[i] == ((1 + 1j) / math.sqrt(2)):
+                finalBitsArray.append(0)
+                finalBitsArray.append(0)
+            if estimatedSymbols[i] == ((-1 + 1j) / math.sqrt(2)):
+                finalBitsArray.append(0)
+                finalBitsArray.append(1)
+            if estimatedSymbols[i] == ((-1 - 1j) / math.sqrt(2)):
+                finalBitsArray.append(1)
+                finalBitsArray.append(1)
+            if estimatedSymbols[i] == ((1 - 1j) / math.sqrt(2)):
+                finalBitsArray.append(1)
+                finalBitsArray.append(0)
+
+        return finalBitsArray
+    if ConstellationName == '8PSK':
+        for i in range(len(estimatedSymbols)):
+            if estimatedSymbols[i] == 1:
+                finalBitsArray.append(1)
+                finalBitsArray.append(1)
+                finalBitsArray.append(1)
+            if estimatedSymbols[i] == 1j:
+                finalBitsArray.append(0)
+                finalBitsArray.append(1)
+                finalBitsArray.append(0)
+            if estimatedSymbols[i] == -1:
+                finalBitsArray.append(0)
+                finalBitsArray.append(0)
+                finalBitsArray.append(1)
+            if estimatedSymbols[i] == -1j:
+                finalBitsArray.append(1)
+                finalBitsArray.append(0)
+                finalBitsArray.append(0)
+            if estimatedSymbols[i] == ((1 + 1j) / math.sqrt(2)):
+                finalBitsArray.append(1)
+                finalBitsArray.append(1)
+                finalBitsArray.append(0)
+            if estimatedSymbols[i] == ((-1 + 1j) / math.sqrt(2)):
+                finalBitsArray.append(0)
+                finalBitsArray.append(1)
+                finalBitsArray.append(1)
+            if estimatedSymbols[i] == ((-1 - 1j) / math.sqrt(2)):
+                finalBitsArray.append(0)
+                finalBitsArray.append(0)
+                finalBitsArray.append(0)
+            if estimatedSymbols[i] == ((1 - 1j) / math.sqrt(2)):
+                finalBitsArray.append(1)
+                finalBitsArray.append(0)
+                finalBitsArray.append(1)
+        return finalBitsArray
+
+
+def getBER_rate(generatedBits, FinalBits, NumSymbols):
+    Errors = 0
+    print("generated", len(generatedBits))
+    print("Final", len(FinalBits))
+    for i in range(len(generatedBits)):
+        if generatedBits[i] != FinalBits[i]:
+            Errors = Errors + 1
+    BER = Errors / NumSymbols
+
+    return BER
+
+
+# Test SETUP###############
+# genBits = []
+BPSK_list = [-1, 1]
+FourQAM_list = [(1 + 1j) / math.sqrt(2), (-1 + 1j) / math.sqrt(2), (-1 - 1j) / math.sqrt(2), (1 - 1j) / math.sqrt(2)]
+eightPSK_list = [1, ((1 + 1j) / math.sqrt(2)), 1j, ((-1 + 1j) / math.sqrt(2)), -1, ((-1 - 1j) / math.sqrt(2)), -1j,
+                 ((1 - 1j) / math.sqrt(2))]
+c_static = [0.89 + 0.92j, 0.42 - 0.37j, 0.19 + 0.12j]
+
+NumSymbols = 200
+# SymbolErrorArray = []
+genBits = 0
+GenNo = 1000000  # loop over the whole process GenNo times
+bitSymbolMap = 0
+receivedSymbol = 0
+EstimatedSymbols = 0
+SymbolErrorRate = 0
+# BitErrorArray = []
+bitErrorRate = 0
+FinalBits = 0
+AveBER_BPSK = []
+AveBER_4QAM = []
+AveBER_8PSK = []
+
+zeroBSNRArray = []
+oneBSNRArray = []
+twoBSNRArray = []
+threeBSNRArray = []
+fourBSNRArray = []
+fifthBSNRArray = []
+sixBSNRArray = []
+sevenBSNRArray = []
+eightBSNRArray = []
+nineBSNRArray = []
+tenBSNRArray = []
+elevenBSNRArray = []
+twelveBSNRArray = []
+thirteenBSNRArray = []
+fourteenBSNRArray = []
+fifteenBSNRArray = []
+
+# NumSymbols = 400
+genBits_Q = 0
+bitSymbolMap_Q = 0
+receivedSymbol_Q = 0
+EstimatedSymbols_Q = 0
+SymbolErrorRate_Q = 0
+# BitErrorArray = []
+bitErrorRate_Q = 0
+FinalBits_Q = 0
+
+zeroQSNRArray = []
+oneQSNRArray = []
+twoQSNRArray = []
+threeQSNRArray = []
+fourQSNRArray = []
+fifthQSNRArray = []
+sixQSNRArray = []
+sevenQSNRArray = []
+eightQSNRArray = []
+nineQSNRArray = []
+tenQSNRArray = []
+elevenQSNRArray = []
+twelveQSNRArray = []
+thirteenQSNRArray = []
+fourteenQSNRArray = []
+fifteenQSNRArray = []
+
+genBits_eight = 0
+bitSymbolMap_eight = 0
+receivedSymbol_eight = 0
+EstimatedSymbols_eight = 0
+SymbolErrorRate_eight = 0
+# BitErrorArray = []
+bitErrorRate_eight = 0
+FinalBits_eight = 0
+
+zeroESNRArray = []
+oneESNRArray = []
+twoESNRArray = []
+threeESNRArray = []
+fourESNRArray = []
+fifthESNRArray = []
+sixESNRArray = []
+sevenESNRArray = []
+eightESNRArray = []
+nineESNRArray = []
+tenESNRArray = []
+elevenESNRArray = []
+twelveESNRArray = []
+thirteenESNRArray = []
+fourteenESNRArray = []
+fifteenESNRArray = []
+
+# genereate GenNo number of blocks
+for x in range(GenNo):
+    # BitErrorArray_BPSK = []
+    SymbolErrorArray_BPSK = []
+    # BitErrorArray_4QAM = []
+    SymbolErrorArray_4QAM = []
+    # BitErrorArray_8PSK = []
+    SymbolErrorArray_8PSK = []
+    c_dynamic = [((gauss()) + ((gauss()) * 1j) / math.sqrt(2.3)), ((gauss()) + ((gauss()) * 1j) / math.sqrt(2.3)),
+                 ((gauss()) + ((gauss()) * 1j) / math.sqrt(2.3))]
+    #print("DYnamic CIR vlae", c_dynamic)
+    for EbNo in range(0, 16):
+        # CIR static vs dynamic
+        CIR = c_static  # Easily  switch between c_static and c_dynamic
+        # Generated N bits
+        genBits = RandomBitsGenerator(NumSymbols)
+        genBits_Q = RandomBitsGenerator(NumSymbols)
+        genBits_eight = RandomBitsGenerator(NumSymbols)
+        # Map bits to symbol
+        bitSymbolMap = BitToSymbolMapping(genBits, 'bpsk')
+        bitSymbolMap_Q = BitToSymbolMapping(genBits_Q, '4QAM')
+        bitSymbolMap_eight = BitToSymbolMapping(genBits_eight, '8PSK')
+        # Calculate received bits
+        receivedSymbol = receivedsymbolGenerator(bitSymbolMap, EbNo, 'bpsk')  # snr
+        receivedSymbol_Q = receivedsymbolGenerator(bitSymbolMap_Q, EbNo, '4QAM')  # snr
+        receivedSymbol_eight = receivedsymbolGenerator(bitSymbolMap_eight, EbNo, '8PSK')  # snr 
+        # Apply DFE
+        EstimatedSymbols = DecisionFeedbackEqualiser(receivedSymbol, CIR, 'bpsk', NumSymbols, BPSK_list)
+        EstimatedSymbols_Q = DecisionFeedbackEqualiser(receivedSymbol_Q, CIR, '4QAM', NumSymbols,
+                                                       FourQAM_list)
+        EstimatedSymbols_eight = DecisionFeedbackEqualiser(receivedSymbol_eight, CIR, '8PSK', NumSymbols,
+                                                           eightPSK_list)
+        # GetSymbolRate
+        SymbolErrorRate = getSymbolError(generatedSymbols=bitSymbolMap, estimatedSymbols=EstimatedSymbols,
+                                         NumSymbols=NumSymbols)
+        SymbolErrorRate_Q = getSymbolError(generatedSymbols=bitSymbolMap_Q, estimatedSymbols=EstimatedSymbols_Q,
+                                           NumSymbols=NumSymbols)
+        SymbolErrorRate_eight = getSymbolError(generatedSymbols=bitSymbolMap_eight,
+                                               estimatedSymbols=EstimatedSymbols_eight,
+                                               NumSymbols=NumSymbols)
+        SymbolErrorArray_BPSK.append(SymbolErrorRate)
+        SymbolErrorArray_4QAM.append(SymbolErrorRate_Q)
+        SymbolErrorArray_8PSK.append(SymbolErrorRate_eight)
+        # GetBits
+        FinalBits = ConvertSymbolBackToBits_BPSK(EstimatedSymbols, 'bpsk')
+        FinalBits_Q = ConvertSymbolBackToBits_BPSK(EstimatedSymbols_Q, '4QAM')
+        FinalBits_eight = ConvertSymbolBackToBits_BPSK(EstimatedSymbols_eight, '8PSK')
+        bitErrorRate = getBER_rate(genBits, FinalBits, NumSymbols)
+        # tHIS IS FOR BPSK
+        if EbNo == 0:
+            zeroBSNRArray.append(bitErrorRate)
+        if EbNo == 1:
+            oneBSNRArray.append(bitErrorRate)
+        if EbNo == 2:
+            twoBSNRArray.append(bitErrorRate)
+        if EbNo == 3:
+            threeBSNRArray.append(bitErrorRate)
+        if EbNo == 4:
+            fourBSNRArray.append(bitErrorRate)
+        if EbNo == 5:
+            fifthBSNRArray.append(bitErrorRate)
+        if EbNo == 6:
+            sixBSNRArray.append(bitErrorRate)
+        if EbNo == 7:
+            sevenBSNRArray.append(bitErrorRate)
+        if EbNo == 8:
+            eightBSNRArray.append(bitErrorRate)
+        if EbNo == 9:
+            nineBSNRArray.append(bitErrorRate)
+        if EbNo == 10:
+            tenBSNRArray.append(bitErrorRate)
+        if EbNo == 11:
+            elevenBSNRArray.append(bitErrorRate)
+        if EbNo == 12:
+            twelveBSNRArray.append(bitErrorRate)
+        if EbNo == 13:
+            thirteenBSNRArray.append(bitErrorRate)
+        if EbNo == 14:
+            fourteenBSNRArray.append(bitErrorRate)
+        if EbNo == 15:
+            fifteenBSNRArray.append(bitErrorRate)
+        # BitErrorArray_BPSK.append(bitErrorRate)
+        # tHIS IS FOR 4QAM
+        bitErrorRate_Q = getBER_rate(genBits_Q, FinalBits_Q, NumSymbols)
+        if EbNo == 0:
+            zeroQSNRArray.append(bitErrorRate_Q)
+        if EbNo == 1:
+            oneQSNRArray.append(bitErrorRate_Q)
+        if EbNo == 2:
+            twoQSNRArray.append(bitErrorRate_Q)
+        if EbNo == 3:
+            threeQSNRArray.append(bitErrorRate_Q)
+        if EbNo == 4:
+            fourQSNRArray.append(bitErrorRate_Q)
+        if EbNo == 5:
+            fifthQSNRArray.append(bitErrorRate_Q)
+        if EbNo == 6:
+            sixQSNRArray.append(bitErrorRate_Q)
+        if EbNo == 7:
+            sevenQSNRArray.append(bitErrorRate_Q)
+        if EbNo == 8:
+            eightQSNRArray.append(bitErrorRate_Q)
+        if EbNo == 9:
+            nineQSNRArray.append(bitErrorRate_Q)
+        if EbNo == 10:
+            tenQSNRArray.append(bitErrorRate_Q)
+        if EbNo == 11:
+            elevenQSNRArray.append(bitErrorRate_Q)
+        if EbNo == 12:
+            twelveQSNRArray.append(bitErrorRate_Q)
+        if EbNo == 13:
+            thirteenQSNRArray.append(bitErrorRate_Q)
+        if EbNo == 14:
+            fourteenQSNRArray.append(bitErrorRate_Q)
+        if EbNo == 15:
+            fifteenQSNRArray.append(bitErrorRate_Q)
+        # BitErrorArray_4QAM.append(bitErrorRate_Q)
+        bitErrorRate_eight = getBER_rate(genBits_eight, FinalBits_eight, NumSymbols)
+        # BitErrorArray_8PSK.append(bitErrorRate_eight)
+        # THIS IS FOR 8PSK
+        if EbNo == 0:
+            zeroESNRArray.append(bitErrorRate_eight)
+        if EbNo == 1:
+            oneESNRArray.append(bitErrorRate_eight)
+        if EbNo == 2:
+            twoESNRArray.append(bitErrorRate_eight)
+        if EbNo == 3:
+            threeESNRArray.append(bitErrorRate_eight)
+        if EbNo == 4:
+            fourESNRArray.append(bitErrorRate_eight)
+        if EbNo == 5:
+            fifthESNRArray.append(bitErrorRate_eight)
+        if EbNo == 6:
+            sixESNRArray.append(bitErrorRate_eight)
+        if EbNo == 7:
+            sevenESNRArray.append(bitErrorRate_eight)
+        if EbNo == 8:
+            eightESNRArray.append(bitErrorRate_eight)
+        if EbNo == 9:
+            nineESNRArray.append(bitErrorRate_eight)
+        if EbNo == 10:
+            tenESNRArray.append(bitErrorRate_eight)
+        if EbNo == 11:
+            elevenESNRArray.append(bitErrorRate_eight)
+        if EbNo == 12:
+            twelveESNRArray.append(bitErrorRate_eight)
+        if EbNo == 13:
+            thirteenESNRArray.append(bitErrorRate_eight)
+        if EbNo == 14:
+            fourteenESNRArray.append(bitErrorRate_eight)
+        if EbNo == 15:
+            fifteenESNRArray.append(bitErrorRate_eight)
+
+        # print("Random generated bits", genBits)
+        # print("BitToSymbolMap ", bitSymbolMap)
+        # print("received symbols ", receivedSymbol)
+        # print("Estimated symbols", EstimatedSymbols)
+        # print("SymbolError", SymbolErrorRate)
+        # print("SymbolErrorArray", SymbolErrorArray)
+        # print("BitError", bitErrorRate)
+        # print("BitErrorArray", BitErrorArray_BPSK)
+# BPSK
+AveBER_BPSK.append(sum(zeroBSNRArray) / GenNo)
+AveBER_BPSK.append(sum(oneBSNRArray) / GenNo)
+AveBER_BPSK.append(sum(twoBSNRArray) / GenNo)
+AveBER_BPSK.append(sum(threeBSNRArray) / GenNo)
+AveBER_BPSK.append(sum(fourBSNRArray) / GenNo)
+AveBER_BPSK.append(sum(fifthBSNRArray) / GenNo)
+AveBER_BPSK.append(sum(sixBSNRArray) / GenNo)
+AveBER_BPSK.append(sum(sevenBSNRArray) / GenNo)
+AveBER_BPSK.append(sum(eightBSNRArray) / GenNo)
+AveBER_BPSK.append(sum(nineBSNRArray) / GenNo)
+AveBER_BPSK.append(sum(tenBSNRArray) / GenNo)
+AveBER_BPSK.append(sum(elevenBSNRArray) / GenNo)
+AveBER_BPSK.append(sum(twelveBSNRArray) / GenNo)
+AveBER_BPSK.append(sum(thirteenBSNRArray) / GenNo)
+AveBER_BPSK.append(sum(fourteenBSNRArray) / GenNo)
+AveBER_BPSK.append(sum(fifteenBSNRArray) / GenNo)
+# 4qam
+AveBER_4QAM.append(sum(zeroQSNRArray) / GenNo)
+AveBER_4QAM.append(sum(oneQSNRArray) / GenNo)
+AveBER_4QAM.append(sum(twoQSNRArray) / GenNo)
+AveBER_4QAM.append(sum(threeQSNRArray) / GenNo)
+AveBER_4QAM.append(sum(fourQSNRArray) / GenNo)
+AveBER_4QAM.append(sum(fifthQSNRArray) / GenNo)
+AveBER_4QAM.append(sum(sixQSNRArray) / GenNo)
+AveBER_4QAM.append(sum(sevenQSNRArray) / GenNo)
+AveBER_4QAM.append(sum(eightQSNRArray) / GenNo)
+AveBER_4QAM.append(sum(nineQSNRArray) / GenNo)
+AveBER_4QAM.append(sum(tenQSNRArray) / GenNo)
+AveBER_4QAM.append(sum(elevenQSNRArray) / GenNo)
+AveBER_4QAM.append(sum(twelveQSNRArray) / GenNo)
+AveBER_4QAM.append(sum(thirteenQSNRArray) / GenNo)
+AveBER_4QAM.append(sum(fourteenQSNRArray) / GenNo)
+AveBER_4QAM.append(sum(fifteenQSNRArray) / GenNo)
+
+# 8psk
+AveBER_8PSK.append(sum(zeroESNRArray) / GenNo)
+AveBER_8PSK.append(sum(oneESNRArray) / GenNo)
+AveBER_8PSK.append(sum(twoESNRArray) / GenNo)
+AveBER_8PSK.append(sum(threeESNRArray) / GenNo)
+AveBER_8PSK.append(sum(fourESNRArray) / GenNo)
+AveBER_8PSK.append(sum(fifthESNRArray) / GenNo)
+AveBER_8PSK.append(sum(sixESNRArray) / GenNo)
+AveBER_8PSK.append(sum(sevenESNRArray) / GenNo)
+AveBER_8PSK.append(sum(eightESNRArray) / GenNo)
+AveBER_8PSK.append(sum(nineESNRArray) / GenNo)
+AveBER_8PSK.append(sum(tenESNRArray) / GenNo)
+AveBER_8PSK.append(sum(elevenESNRArray) / GenNo)
+AveBER_8PSK.append(sum(twelveESNRArray) / GenNo)
+AveBER_8PSK.append(sum(thirteenESNRArray) / GenNo)
+AveBER_8PSK.append(sum(fourteenESNRArray) / GenNo)
+AveBER_8PSK.append(sum(fifteenESNRArray) / GenNo)
+
+print(AveBER_BPSK)
+print(AveBER_4QAM)
+print(AveBER_8PSK)
+
+# plot graph
+EBN0 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+# plt.axis([0, 15, 0, 0.5])
+if CIR == c_static:
+    plt.title("DFE results for c_static")
+    plt.xlabel('EB/No')
+    plt.ylabel('BER')
+    plt.grid()
+    plt.semilogy(EBN0, AveBER_BPSK, color='b', label='BPSK DFE')
+    plt.semilogy(EBN0, AveBER_4QAM, color='r', label='4QAM DFE')
+    plt.semilogy(EBN0, AveBER_8PSK, color='g', label='8PSK DFE')
+    plt.legend()
+    plt.show()
+elif CIR == c_dynamic:
+    plt.title("DFE results for c_dynamic")
+    plt.xlabel('EB/No')
+    plt.ylabel('BER')
+    plt.grid()
+    plt.semilogy(EBN0, AveBER_BPSK, color='b', label='BPSK DFE')
+    plt.semilogy(EBN0, AveBER_4QAM, color='r', label='4QAM DFE')
+    plt.semilogy(EBN0, AveBER_8PSK, color='g', label='8PSK DFE')
+    plt.show()
