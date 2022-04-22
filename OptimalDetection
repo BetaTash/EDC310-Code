@@ -1,0 +1,73 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import math
+
+# Author : Natasha Mulumba 12 September 2021
+# Information
+r_t = 0.47 - 0.21j
+sigma = 0.67
+# Constellations
+BPSK = np.array([-1, 1])
+QPSK = np.array([1, 1j, -1, -1j])
+FourQAM = np.array(
+    [(1 + 1j) / math.sqrt(2), (-1 + 1j) / math.sqrt(2), (-1 - 1j) / math.sqrt(2), (1 - 1j) / math.sqrt(2)])
+eightPSK = np.array([1, ((1 + 1j) / math.sqrt(2)), 1j, ((-1 + 1j) / math.sqrt(2)), -1, ((-1 - 1j) / math.sqrt(2)), -1j,
+                     ((1 - 1j) / math.sqrt(2))])
+sixteen_QAM = np.array(
+    [(1 / 3) + 1j, 1 + 1j, (1 / 3) + (1 / 3) * 1j, 1 + (1 / 3) * 1j, (-1 / 3) + 1j, -1 + 1j, (-1 / 3) + (1 / 3) * 1j,
+     -1 + (1 / 3) * 1j, (-1 / 3) - 1j, -1 - 1j, (-1 / 3) - (1 / 3) * 1j, -1 - (1 / 3) * 1j, (1 / 3) - 1j, 1 - 1j,
+     (1 / 3) - (1 / 3) * 1j, 1 - (1 / 3) * 1j])
+Hybrid = np.array(
+    [1, 1j, -1, -1j, (1 / 3) + (1 / 3) * 1j, (-1 / 3) + (1 / 3) * 1j, (-1 / 3) - (1 / 3) * 1j, (1 / 3) - (1 / 3) * 1j])
+# Optimal Detection
+symbol = QPSK  # CHANGE CONSTELLATION SYMBOL HERE!!!!!!!
+prob_list = []
+prob_list = np.zeros(len(symbol))
+prob_list_rt = []
+prob_list_rt = np.zeros(len(symbol))
+probability_of_symbol = []
+probability_of_symbol = np.zeros(len(symbol))
+
+M = len(symbol)
+# for i in range(len(symbol)):
+#     probability_of_symbol[i] = 1 / M  # equiprobable
+probability_of_symbol = [0.1, 0.3, 0.4, 0.2]  # NOTequiprobable
+print('######################################')
+print("Probability without Beta value")
+for i in range(len(symbol)):
+    Euclid_distance = -pow(abs(r_t - symbol[i]), 2)
+    probabilty = math.exp(Euclid_distance / (2 * sigma ** 2))
+    prob_list[i] = probabilty  # keep list of probabilities
+    print("P(s" + str(i) + "|rt)=Beta*" + f'{round(probabilty, 4)}')
+
+# Obtain Beta
+values = []
+values = np.zeros(len(symbol))
+print("################################")
+for i in range(len(symbol)):
+    values[i] = prob_list[i] * probability_of_symbol[i]
+    print("P(si)*P(si|rt)=" +f'{round(values[i], 4)}')
+prob_list = values
+Beta = 1 / sum(prob_list)
+print("Beta= " + str(Beta))
+higest_val = 0
+highest_val_index = 0
+
+# Get final probability value
+print("#######################################")
+print("Final Probability with Beta value")
+for i in range(len(symbol)):
+    Euclid_distance = -pow(abs(r_t - symbol[i]), 2)
+    probabilty = Beta * prob_list[i]  # updated value
+    prob_list[i] = probabilty  # keep list of probabilities
+    print("P(s" + str(i) + "|rt)=" + f'{round(probabilty, 4)}')
+    # Save highest probability
+    if probabilty > higest_val:
+        higest_val = probabilty
+        highest_val_index = i
+
+print("FINAL RESULTS")
+print("Final probability array "+ str(prob_list))
+print("highest probability")
+print("P(s" + str(highest_val_index) + "|rt)=" + f'{round(higest_val, 4)}')
+
