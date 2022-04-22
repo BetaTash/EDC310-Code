@@ -1,0 +1,60 @@
+# Example of Channel estimation - Even number
+# Author Natasha Mulumba 
+# Last modified : 25 October 2021
+import numpy as np
+
+N = 20
+L = 4
+P = 2 * L
+s = np.array([-1, -1, 1, 1, 1, -1, -1, -1, 1, -1, -1, -1, 1, 1, 1, -1, 1, -1, 1, -1])
+r = np.array(
+    [0.5284, 1.66983, 0.9833, -0.5284, -1.6983, -0.9833, 0.3836, 0.0419, -1.6983, -0.9833, 0.5284, 1.6983, 0.9833,
+     -0.3836, -0.1866, -0.1866, 0.1143, -0.8701, 0.2851])
+p_start = int(N / 2 - P / 2 + 1)
+p_stop = int(N / 2 + P / 2)
+p = s[p_start - 1:p_stop]  # start at one index before p_start
+r_pilot = []
+r_pilot = r[p_start - 1:p_start + 4]
+r_pilot = np.matrix(r_pilot)
+print('received pilot symbols')
+print(r_pilot)
+#######################Calculate Q matrix###################################################
+# Q matrix is {L x P-L+1}
+Q = []
+Q = np.zeros(L * (P - L + 1), dtype=int)
+pos = L
+i = 0
+x = 0
+temp = []
+while pos != len(p) + 1:
+    Q[x:x + L] = p[i:pos]  # create list of q matrix values
+    i = i + 1
+    x = x + L
+    pos = pos + 1
+Q = Q.reshape((P - L + 1), L)  # reshape list into 2D array length (P-L+1)xL
+Q = np.fliplr(Q)  # flip the elements in each row around
+print("Q")
+print(Q)
+Q_H = np.matrix.getH(Q)  # get the hermitian matrix of Q
+print("QH")
+print(Q_H)
+
+QHQ = np.matmul(Q_H, Q)  # get the multiplication of Q hermitian * Q
+print("QHQ")
+print(QHQ)
+#######################Calculate Q matrix###################################################
+##################Calculate Exact And Approximate solution#####################################
+# ExactSolution
+QHr = (np.matmul(Q_H, r_pilot.T))
+print("QHr")
+print(QHr)
+print("c_est = QHr.T / QHQ")
+print(np.matmul(QHr.T, np.linalg.inv(QHQ)))
+
+# Approximate solution
+k = 5
+Approxi_c_est = (1 / k) * QHr
+print("Approximated c_est = (1/k)*(Qhr)")
+print(Approxi_c_est.T)
+
+##################Calculate Exact And Approximate solution#####################################
